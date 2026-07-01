@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEUROSCAN - EEG Monitor</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            background: #060a07;
+            color: #cfead9;
+            font-family: 'Courier New', monospace;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            max-width: 1100px;
+            width: 100%;
+            background: #0a100b;
+            border: 1px solid #1b2e22;
+            border-radius: 10px;
+            padding: 25px;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #1b2e22;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .title {
+            color: #39ff88;
+            font-size: 22px;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(57, 255, 136, 0.2);
+        }
+        .title span {
+            font-size: 14px;
+            color: #5c7d68;
+            font-weight: normal;
+        }
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+        }
+        .status .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ff4d4d;
+            animation: blink 1s infinite;
+        }
+        @keyframes blink {
+            0%,
+            100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.15;
+            }
+        }
+        .controls {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .controls button {
+            background: transparent;
+            border: 1px solid #1b2e22;
+            color: #5c7d68;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+        .controls button:hover {
+            border-color: #39ff88;
+            color: #39ff88;
+        }
+        .controls button.active {
+            border-color: #fbbf24;
+            color: #fbbf24;
+        }
+        .controls button.primary {
+            background: #1b2e22;
+            color: #cfead9;
+        }
+        .controls button.primary:hover {
+            background: #2a4a33;
+        }
+
+        .info-bar {
+            display: flex;
+            gap: 20px;
+            font-size: 12px;
+            color: #5c7d68;
+            padding: 10px 0;
+            border-bottom: 1px solid #10201a;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .info-bar .mode {
+            color: #39ff88;
+            font-weight: bold;
+        }
+
+        .channels {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .channel {
+            display: grid;
+            grid-template-columns: 120px 1fr;
+            gap: 15px;
+            align-items: center;
+            padding: 8px 12px;
+            background: #0c140e;
+            border-radius: 5px;
+            border: 1px solid #10201a;
+            transition: background 0.3s;
+        }
+        .channel:hover {
+            border-color: #1b2e22;
+        }
+        .channel.flash {
+            background: rgba(255, 77, 77, 0.08);
+        }
+        .channel-info {
+            line-height: 1.5;
+        }
+        .channel-info .name {
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .channel-info .band {
+            font-size: 10px;
+            color: #5c7d68;
+        }
+        .channel-info .value {
+            font-size: 16px;
+            font-weight: bold;
+            margin-top: 2px;
+        }
+        .channel-info .quality {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 5px;
+            vertical-align: middle;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 80px;
+            border-radius: 4px;
+            background: #060a07;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 1px;
+            background: #1b2e22;
+            border-radius: 5px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+        .stat-item {
+            background: #0a100b;
+            padding: 12px 16px;
+        }
+        .stat-item .label {
+            font-size: 10px;
+            color: #5c7d68;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .stat-item .value {
+            font-size: 20px;
+            color: #39ff88;
+            margin-top: 3px;
+        }
+
+        .log-section {
+            border-top: 1px solid #1b2e22;
+            padding-top: 15px;
+            margin-top: 5px;
+        }
+        .log-section h3 {
+            font-size: 11px;
+            color: #5c7d68;
+            letter-spacing: 0.08em;
+            margin-bottom: 8px;
+            font-weight: normal;
+        }
+        .log-list {
+            height: 100px;
+            overflow-y: auto;
+            font-size: 12px;
+            line-height: 1.8;
+        }
+        .log-list::-webkit-scrollbar {
+            width: 5px;
+        }
+        .log-list::-webkit-scrollbar-thumb {
+            background: #1b2e22;
+            border-radius: 3px;
+        }
+        .log-entry {
+            display: flex;
+            gap: 15px;
+            color: #5c7d68;
+        }
+        .log-entry .time {
+            color: #1b2e22;
+            flex-shrink: 0;
+        }
+        .log-entry.alert {
+            color: #ff4d4d;
+        }
+        .log-entry.alert .time {
+            color: #ff4d4d;
+            opacity: 0.5;
+        }
+        .log-entry.info {
+            color: #5c7d68;
+        }
+
+        footer {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #10201a;
+            font-size: 11px;
+            color: #1b2e22;
+            text-align: center;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .channel {
+                grid-template-columns: 1fr;
+                gap: 5px;
+            }
+            .header {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .controls {
+                justify-content: center;
+            }
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="title">
+                🧠 NEUROSCAN <span>EEG Monitor</span>
+            </div>
+            <div class="status">
+                <span class="dot" id="statusDot"></span>
+                <span id="statusLabel">LIVE</span>
+                <span id="clock">00:00</span>
+            </div>
+            <div class="controls">
+                <input type="file" id="fileInput" accept=".csv,.json" class="hidden">
+                <button class="primary" id="loadBtn">📂 LOAD DATA</button>
+                <button id="simBtn">🔄 SIMULATED</button>
+                <button id="freezeBtn">⏸ FREEZE</button>
+                <button id="silenceBtn">🔇 SILENCE</button>
+            </div>
+        </div>
+
+        <!-- Info Bar -->
+        <div class="info-bar">
+            <span class="mode" id="modeLabel">MODE: SIMULATED</span>
+            <span id="fileInfo">— No data loaded</span>
+        </div>
+
+        <!-- Channels -->
+        <div class="channels" id="channels"></div>
+
+        <!-- Stats -->
+        <div class="stats-grid">
+            <div class="stat-item">
+                <div class="label">AVG SIGNAL</div>
+                <div class="value" id="statAvg">0.00</div>
+            </div>
+            <div class="stat-item">
+                <div class="label">PEAK RANGE</div>
+                <div class="value" id="statRange">0.00 / 0.00</div>
+            </div>
+            <div class="stat-item">
+                <div class="label">SAMPLES</div>
+                <div class="value" id="statSamples">0</div>
+            </div>
+            <div class="stat-item">
+                <div class="label">EVENTS</div>
+                <div class="value" id="statEvents">0</div>
+            </div>
+        </div>
+
+        <!-- Log -->
+        <div class="log-section">
+            <h3>📋 EVENT LOG</h3>
+            <div class="log-list" id="logList">
+                <div class="log-entry info">
+                    <span class="time">00:00</span>
+                    <span>System ready — Press LOAD DATA to analyze EEG file</span>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            NEUROSCAN v1.0 — Built for EEG data exploration. Simulated mode generates synthetic brain waves.
+            Load CSV/JSON files for real data analysis.
+        </footer>
+    </div>
+
+    <script>
+        (function() {
+            // ============================================
+            // STATE
+            // ============================================
+            const state = {
+                running: true,
+                silenced: false,
+                elapsedMs: 0,
+                totalSamples: 0,
+                rollingBuffer: [],
+                events: 0,
+                isReal: false,
+                dataPoints: [],
+                dataIndex: 0
+            };
+
+            const SAMPLE_INTERVAL = 90;
+            const SWEEP_DURATION_MS = 6000;
+            const ROLLING_MAX = 120;
+            const LOG_MAX = 30;
+
+            // ============================================
+            // EEG WAVE DEFINITIONS
+            // ============================================
+            const COLORS = ['#f472b6', '#fbbf24', '#39ff88', '#22d3ee', '#a78bfa', '#fb7185', '#34d399', '#f59e0b'];
+
+            const SYNTH_DEFS = [
+                { name: 'δ DELTA', band: '0.5–4 Hz', freq: 0.4, amp: 1.8, color: COLORS[0] },
+                { name: 'θ THETA', band: '4–8 Hz', freq: 0.9, amp: 1.3, color: COLORS[1] },
+                { name: 'α ALPHA', band: '8–12 Hz', freq: 1.6, amp: 0.9, color: COLORS[2] },
+                { name: 'β BETA', band: '13–30 Hz', freq: 3.0, amp: 0.6, color: COLORS[3] }
+            ];
+
+            let channels = [];
+            let channelDefs = SYNTH_DEFS;
+
+            // ============================================
+            // DOM REFS
+            // ============================================
+            const channelsEl = document.getElementById('channels');
+            const logListEl = document.getElementById('logList');
+            const clockEl = document.getElementById('clock');
+            const freezeBtn = document.getElementById('freezeBtn');
+            const silenceBtn = document.getElementById('silenceBtn');
+            const loadBtn = document.getElementById('loadBtn');
+            const simBtn = document.getElementById('simBtn');
+            const fileInput = document.getElementById('fileInput');
+            const statusDot = document.getElementById('statusDot');
+            const statusLabel = document.getElementById('statusLabel');
+            const modeLabel = document.getElementById('modeLabel');
+            const fileInfo = document.getElementById('fileInfo');
+
+            // ============================================
+            // BUILD CHANNELS
+            // ============================================
+            function buildChannels(defs) {
+                channelsEl.innerHTML = '';
+                channels = defs.map((cfg, idx) => {
+                    const row = document.createElement('div');
+                    row.className = 'channel';
+                    row.dataset.channel = idx;
+
+                    const color = cfg.color || COLORS[idx % COLORS.length];
+
+                    row.innerHTML = `
+                        <div class="channel-info">
+                            <div class="name" style="color:${color}">${cfg.name}</div>
+                            <div class="band">${cfg.band || ''}</div>
+                            <div class="value">
+                                <span class="quality" style="background:${color}"></span>
+                                <span class="valNum">0.00</span>
+                            </div>
+                        </div>
+                        <canvas></canvas>
+                    `;
+
+                    channelsEl.appendChild(row);
+
+                    const canvas = row.querySelector('canvas');
+                    const valNum = row.querySelector('.valNum');
+                    const quality = row.querySelector('.quality');
+
+                    const cssWidth = 800,
+                        cssHeight = 80;
+                    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+                    canvas.width = cssWidth * dpr;
+                    canvas.height = cssHeight * dpr;
+                    const ctx = canvas.getContext('2d');
+                    ctx.scale(dpr, dpr);
+
+                    return {
+                        cfg,
+                        row,
+                        canvas,
+                        ctx,
+                        valNum,
+                        quality,
+                        width: cssWidth,
+                        height: cssHeight,
+                        buffer: new Array(cssWidth).fill(NaN),
+                        sweepX: 0,
+                        phase: Math.random() * 10,
+                        prevValue: 0,
+                        nextValue: 0,
+                        sampleTimer: 0,
+                        flashUntil: 0,
+                        scale: cfg.amp || 1,
+                        history: [],
+                        dataIndex: 0,
+                        isReal: cfg.isReal || false
+                    };
+                });
+
+                // Resize
+                resizeChannels();
+            }
+
+            function resizeChannels() {
+                channels.forEach((ch) => {
+                    const rect = ch.canvas.getBoundingClientRect();
+                    const w = rect.width || 800;
+                    const h = rect.height || 80;
+                    if (ch.width !== w || ch.height !== h) {
+                        ch.width = w;
+                        ch.height = h;
+                        ch.buffer = new Array(Math.ceil(w)).fill(NaN);
+                    }
+                });
+            }
+
+            window.addEventListener('resize', resizeChannels);
+
+            // ============================================
+            // SIGNAL GENERATION
+            // ============================================
+            function synthSample(ch) {
+                ch.phase += ch.cfg.freq || 0.5;
+                const jitter = 0.7 + Math.random() * 0.6;
+                let v = (ch.cfg.amp || 1) * jitter * Math.sin(ch.phase) +
+                    0.2 * (ch.cfg.amp || 1) * Math.sin(ch.phase * 2.3 + 1.7);
+
+                // Noise
+                v += (Math.random() + Math.random() - 1) * 0.15;
+
+                // Random spikes
+                if (Math.random() < 0.012) v *= 2.5;
+                if (Math.random() < 0.008) v *= -2.5;
+
+                return v;
+            }
+
+            function realSample(ch) {
+                const data = ch.cfg.data;
+                if (!data || !data.length) return 0;
+                const idx = ch.dataIndex % data.length;
+                ch.dataIndex++;
+                return data[idx] || 0;
+            }
+
+            // ============================================
+            // DRAWING
+            // ============================================
+            function drawChannel(ch) {
+                const { ctx, width, height, buffer, cfg } = ch;
+                const color = cfg.color || '#39ff88';
+
+                ctx.clearRect(0, 0, width, height);
+                ctx.fillStyle = '#060a07';
+                ctx.fillRect(0, 0, width, height);
+
+                // Grid
+                ctx.strokeStyle = '#10201a';
+                ctx.lineWidth = 0.5;
+                ctx.beginPath();
+                for (let x = 0; x < width; x += 30) {
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, height);
+                }
+                for (let y = 0; y < height; y += 20) {
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(width, y);
+                }
+                ctx.stroke();
+
+                // Signal
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 1.5;
+                ctx.shadowColor = color;
+                ctx.shadowBlur = 4;
+
+                ctx.beginPath();
+                let started = false;
+                for (let x = 0; x < width; x++) {
+                    const y = buffer[x];
+                    if (Number.isNaN(y)) { started = false; continue; }
+                    if (!started) { ctx.moveTo(x, y);
+                        started = true; } else ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+
+                // Sweep cursor
+                const sx = Math.floor(ch.sweepX);
+                ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(sx, 0);
+                ctx.lineTo(sx, height);
+                ctx.stroke();
+            }
+
+            // ============================================
+            // UPDATE LOOP
+            // ============================================
+            function tick(dt) {
+                state.elapsedMs += dt;
+                clockEl.textContent = formatClock(state.elapsedMs);
+
+                const speedPxPerMs = channels[0]?.width / SWEEP_DURATION_MS || 0.1;
+
+                channels.forEach((ch) => {
+                    ch.sampleTimer += dt;
+
+                    if (ch.sampleTimer >= SAMPLE_INTERVAL) {
+                        ch.sampleTimer = 0;
+                        ch.prevValue = ch.nextValue;
+
+                        const v = ch.isReal ? realSample(ch) : synthSample(ch);
+                        ch.nextValue = v;
+
+                        // Track stats
+                        state.totalSamples++;
+                        state.rollingBuffer.push(v);
+                        if (state.rollingBuffer.length > ROLLING_MAX) state.rollingBuffer.shift();
+
+                        // Detect anomalies
+                        ch.history.push(v);
+                        if (ch.history.length > 50) ch.history.shift();
+
+                        if (ch.history.length > 10) {
+                            const mean = ch.history.reduce((a, b) => a + b, 0) / ch.history.length;
+                            const variance = ch.history.reduce((a, b) => a + (b - mean) ** 2, 0) / ch.history.length;
+                            const std = Math.sqrt(variance) || 0.1;
+                            const z = Math.abs((v - mean) / std);
+
+                            if (z > 3.5) {
+                                state.events++;
+                                document.getElementById('statEvents').textContent = state.events;
+                                addLog(ch.cfg.name, `⚡ Anomaly: ${v.toFixed(2)} (z=${z.toFixed(1)})`, 'alert');
+                                if (!state.silenced) {
+                                    ch.flashUntil = state.elapsedMs + 500;
+                                }
+                            }
+                        }
+
+                        ch.valNum.textContent = v.toFixed(2);
+                        ch.scale = Math.max(ch.scale * 0.995, Math.abs(v) * 1.4, 0.5);
+                    }
+
+                    const frac = Math.min(1, ch.sampleTimer / SAMPLE_INTERVAL);
+                    const display = ch.prevValue + (ch.nextValue - ch.prevValue) * frac;
+
+                    ch.row.classList.toggle('flash', state.elapsedMs < ch.flashUntil);
+
+                    ch.sweepX += speedPxPerMs * dt;
+                    if (ch.sweepX >= ch.width) ch.sweepX -= ch.width;
+
+                    const col = Math.floor(ch.sweepX);
+                    const y = ch.height / 2 - (display / ch.scale) * (ch.height / 2.5);
+                    ch.buffer[col] = Math.max(2, Math.min(ch.height - 2, y));
+
+                    // Gap after sweep
+                    for (let g = 1; g <= 12; g++) {
+                        ch.buffer[(col + g) % ch.width] = NaN;
+                    }
+
+                    drawChannel(ch);
+                });
+
+                updateStats();
+            }
+
+            // ============================================
+            // HELPERS
+            // ============================================
+            function formatClock(ms) {
+                const s = Math.floor(ms / 1000);
+                return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+            }
+
+            function addLog(channel, message, severity = 'info') {
+                const entry = {
+                    time: formatClock(state.elapsedMs),
+                    channel,
+                    message,
+                    severity
+                };
+
+                // Keep last LOG_MAX
+                const items = logListEl.querySelectorAll('.log-entry');
+                if (items.length >= LOG_MAX) {
+                    items[items.length - 1]?.remove();
+                }
+
+                const div = document.createElement('div');
+                div.className = `log-entry ${severity}`;
+                div.innerHTML = `<span class="time">${entry.time}</span><span>${channel ? channel + ' — ' : ''}${message}</span>`;
+                logListEl.prepend(div);
+            }
+
+            function updateStats() {
+                if (!state.rollingBuffer.length) return;
+                const vals = state.rollingBuffer;
+                const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+                const max = Math.max(...vals);
+                const min = Math.min(...vals);
+
+                document.getElementById('statAvg').textContent = avg.toFixed(2);
+                document.getElementById('statRange').textContent = `${min.toFixed(2)} / ${max.toFixed(2)}`;
+                document.getElementById('statSamples').textContent = state.totalSamples;
+            }
+
+            // ============================================
+            // FILE LOADING
+            // ============================================
+            function loadCSVData(text) {
+                const lines = text.split(/\r?\n/).filter(l => l.trim().length);
+                if (lines.length < 2) return null;
+
+                const header = lines[0].split(',').map(h => h.trim().toLowerCase());
+                const timeIdx = header.findIndex(h => h.includes('time') || h.includes('timestamp'));
+
+                // Find numeric columns
+                const numericCols = [];
+                for (let i = 0; i < header.length; i++) {
+                    if (i === timeIdx) continue;
+                    // Check if column has numeric data
+                    const sample = lines[1].split(',')[i]?.trim();
+                    if (sample && !isNaN(parseFloat(sample))) {
+                        numericCols.push(i);
+                    }
+                }
+
+                if (numericCols.length === 0) return null;
+
+                const numChannels = Math.min(numericCols.length, 8);
+                const channelData = [];
+
+                for (let ci = 0; ci < numChannels; ci++) {
+                    const colIdx = numericCols[ci];
+                    const values = [];
+                    for (let li = 1; li < lines.length; li++) {
+                        const parts = lines[li].split(',');
+                        const val = parseFloat(parts[colIdx]?.trim());
+                        if (!isNaN(val)) values.push(val);
+                    }
+                    if (values.length > 10) {
+                        channelData.push({
+                            name: header[colIdx] || `CH${ci+1}`,
+                            values: values
+                        });
+                    }
+                }
+
+                return channelData;
+            }
+
+            function loadJSONData(text) {
+                try {
+                    const obj = JSON.parse(text);
+                    let data = null;
+
+                    if (Array.isArray(obj) && obj.length > 0) {
+                        const keys = Object.keys(obj[0]).filter(k => !k.toLowerCase().includes('time'));
+                        if (keys.length > 0) {
+                            data = keys.slice(0, 8).map(k => ({
+                                name: k,
+                                values: obj.map(row => parseFloat(row[k])).filter(v => !isNaN(v))
+                            }));
+                        }
+                    } else if (obj.channels) {
+                        data = Object.keys(obj.channels).slice(0, 8).map(k => ({
+                            name: k,
+                            values: obj.channels[k].map(Number).filter(v => !isNaN(v))
+                        }));
+                    }
+
+                    return data?.filter(d => d.values.length > 10) || null;
+                } catch {
+                    return null;
+                }
+            }
+
+            // ============================================
+            // INIT MODE
+            // ============================================
+            function initMode(defs, modeText, fileInfoText = '') {
+                state.rollingBuffer = [];
+                state.totalSamples = 0;
+                state.events = 0;
+                state.elapsedMs = 0;
+                state.dataIndex = 0;
+
+                document.getElementById('statEvents').textContent = '0';
+                document.getElementById('statSamples').textContent = '0';
+
+                logListEl.innerHTML = '';
+                addLog('', `Mode: ${modeText}`, 'info');
+
+                buildChannels(defs);
+                modeLabel.textContent = `MODE: ${modeText}`;
+                fileInfo.textContent = fileInfoText || '—';
+
+                // Reset stats
+                document.getElementById('statAvg').textContent = '0.00';
+                document.getElementById('statRange').textContent = '0.00 / 0.00';
+            }
+
+            // ============================================
+            // EVENT LISTENERS
+            // ============================================
+
+            // Load file
+            loadBtn.addEventListener('click', () => fileInput.click());
+
+            fileInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const text = event.target.result;
+                    let data = null;
+
+                    if (file.name.toLowerCase().endsWith('.json')) {
+                        data = loadJSONData(text);
+                    } else {
+                        data = loadCSVData(text);
+                    }
+
+                    if (!data || data.length === 0) {
+                        addLog('', `❌ Failed to parse ${file.name} — no numeric channels found`, 'alert');
+                        return;
+                    }
+
+                    // Build defs from data
+                    const defs = data.map((d, i) => ({
+                        name: d.name.toUpperCase().slice(0, 10),
+                        band: `${d.values.length} samples`,
+                        isReal: true,
+                        data: d.values,
+                        color: COLORS[i % COLORS.length],
+                        amp: 1
+                    }));
+
+                    initMode(defs, `LOADED — ${file.name}`, `${data.length} channels, ${data[0]?.values.length || 0} samples`);
+                    state.isReal = true;
+                    simBtn.textContent = 'SIMULATED';
+                    simBtn.classList.remove('active');
+                    loadBtn.classList.add('active');
+                    addLog('', `✅ Loaded ${file.name} with ${data.length} channels`, 'info');
+                };
+
+                reader.readAsText(file);
+                fileInput.value = '';
+            });
+
+            // Simulated mode
+            simBtn.addEventListener('click', () => {
+                initMode(SYNTH_DEFS, 'SIMULATED', '— Synthetic EEG data');
+                state.isReal = false;
+                loadBtn.classList.remove('active');
+                addLog('', 'Switched to simulated mode', 'info');
+            });
+
+            // Freeze
+            freezeBtn.addEventListener('click', () => {
+                state.running = !state.running;
+                freezeBtn.textContent = state.running ? '⏸ FREEZE' : '▶ RESUME';
+                freezeBtn.classList.toggle('active', !state.running);
+                statusLabel.textContent = state.running ? 'LIVE' : 'PAUSED';
+                statusDot.style.animationPlayState = state.running ? 'running' : 'paused';
+                statusDot.style.opacity = state.running ? '1' : '0.3';
+                addLog('', state.running ? 'Resumed' : 'Paused', 'info');
+            });
+
+            // Silence
+            silenceBtn.addEventListener('click', () => {
+                state.silenced = !state.silenced;
+                silenceBtn.textContent = state.silenced ? '🔊 UNSILENCE' : '🔇 SILENCE';
+                silenceBtn.classList.toggle('active', state.silenced);
+                addLog('', state.silenced ? 'Alarms silenced' : 'Alarms enabled', 'info');
+            });
+
+            // ============================================
+            // ANIMATION LOOP
+            // ============================================
+            let last = performance.now();
+
+            function loop(now) {
+                const dt = Math.min(50, now - last);
+                last = now;
+                if (state.running) tick(dt);
+                requestAnimationFrame(loop);
+            }
+
+            // ============================================
+            // START
+            // ============================================
+            initMode(SYNTH_DEFS, 'SIMULATED', '— Synthetic EEG data');
+            addLog('', '🚀 NEUROSCAN ready — Load an EEG file or watch simulated waves', 'info');
+            requestAnimationFrame(loop);
+        })();
+    </script>
+</body>
+</html>
